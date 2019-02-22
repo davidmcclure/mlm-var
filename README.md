@@ -1,5 +1,5 @@
 
-# Linguistic variation via masked language models
+# Linguistic variation via masked language models (WIP)
 
 Can we use something like the MLM (masked language model) objective from BERT to model linguistic variation across different corpora? In theory, this might make it possible to inductively identify differences in *how* words are being used, instead of just differences in *how frequently* words are used; and to identify specific instances of words/phrases that most typify those differences.
 
