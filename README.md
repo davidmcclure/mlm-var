@@ -10,4 +10,4 @@ Can we use something like the MLM (masked language model) objective from BERT to
   - [token, zeros] -> A/B
   - [token, contextual token] -> A/B
   - So, one pair where the classifier has access to both the independent token embedding and the sentence context; and another where the model just sees the isolated token embedding, and knows nothing about the context.
-- Then, find cases where the addition of the sentence context (second case) makes the model significantly more accurate than just the isolated token (first case). Or, cases where `(word+context)` is more discriminating than just `(word)`.
+- Then, find cases where the addition of the sentence context (second case) makes the model significantly more accurate than just the isolated token (first case). Or, cases where `(word+context)` provides more information about the sentence label than just `(word)`.
