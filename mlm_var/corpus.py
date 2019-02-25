@@ -3,8 +3,10 @@
 from typing import List
 from dataclasses import dataclass
 from itertools import islice
+from collections import Counter
+from tqdm import tqdm
 
-from . import utils
+from . import utils, logger
 
 
 @dataclass
@@ -35,10 +37,21 @@ class Corpus:
     def from_spark_lines(cls, path, skim=None, **kwargs):
         """Read JSON gz lines.
         """
-        lines_iter = islice(Line.read_spark_lines(path), skim)
+        lines_iter = tqdm(islice(Line.read_spark_lines(path), skim))
+
         return cls(list(lines_iter), **kwargs)
 
     def __init__(self, lines, test_frac=0.1):
         self.lines = lines
         self.test_frac = test_frac
-        # self.set_splits()
+
+    def token_counts(self):
+        """Collect all token -> count.
+        """
+        logger.info('Gathering token counts.')
+
+        counts = Counter()
+        for line in tqdm(self.lines):
+            counts.update(line.clf_tokens)
+
+        return counts
