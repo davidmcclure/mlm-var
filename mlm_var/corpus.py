@@ -2,6 +2,7 @@
 
 from typing import List
 from dataclasses import dataclass
+from itertools import islice
 
 from . import utils
 
@@ -26,3 +27,18 @@ class Line:
         """
         for row in utils.read_json_gz_lines(root):
             yield cls.from_dict(row)
+
+
+class Corpus:
+
+    @classmethod
+    def from_spark_lines(cls, path, skim=None, **kwargs):
+        """Read JSON gz lines.
+        """
+        lines_iter = islice(Line.read_spark_lines(path), skim)
+        return cls(list(lines_iter), **kwargs)
+
+    def __init__(self, lines, test_frac=0.1):
+        self.lines = lines
+        self.test_frac = test_frac
+        # self.set_splits()
