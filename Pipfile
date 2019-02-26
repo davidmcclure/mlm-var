@@ -11,6 +11,7 @@ ujson = "*"
 tqdm = "*"
 numpy = "*"
 torchtext = "*"
+boltons = "*"
 
 [dev-packages]
 

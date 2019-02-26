@@ -6,6 +6,8 @@ from itertools import islice
 from collections import Counter
 from tqdm import tqdm
 
+from torch.utils.data import random_split
+
 from . import utils, logger
 
 
@@ -28,7 +30,10 @@ class Line:
         """Parse JSON lines, build match objects.
         """
         for row in utils.read_json_gz_lines(root):
-            yield cls.from_dict(row)\
+            yield cls.from_dict(row)
+
+    def __len__(self):
+        return len(self.clf_tokens)
 
 
 class Corpus:
@@ -44,6 +49,7 @@ class Corpus:
     def __init__(self, lines, test_frac=0.1):
         self.lines = lines
         self.test_frac = test_frac
+        self.set_splits()
 
     def __len__(self):
         return len(self.lines)
@@ -58,3 +64,12 @@ class Corpus:
             counts.update(line.clf_tokens)
 
         return counts
+
+    def set_splits(self):
+        """Fix train/val/test splits.
+        """
+        test_size = round(len(self) * self.test_frac)
+        train_size = len(self) - (test_size * 2)
+
+        sizes = (train_size, test_size, test_size)
+        self.train, self.val, self.test = random_split(self.lines, sizes)

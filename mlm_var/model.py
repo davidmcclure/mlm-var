@@ -5,6 +5,7 @@ import numpy as np
 import string
 
 from itertools import chain
+from boltons.iterutils import chunked_iter
 
 from torch import nn
 from torchtext.vocab import Vocab, Vectors
@@ -222,7 +223,7 @@ CLF_EMBED_SIZE = 512
 CLF_HIDDEN_SIZE = 256
 
 
-class LanguageModel(nn.Module):
+class MLM(nn.Module):
 
     def __init__(self, token_counts, max_vocab_size=MAX_VOCAB_SIZE,
         embed_size=CLF_EMBED_SIZE, hidden_size=CLF_HIDDEN_SIZE):
@@ -251,13 +252,11 @@ class LanguageModel(nn.Module):
     def embed(self, lines, ctx):
         """Embed lines.
         """
-        tokens = [line.clf_tokens for line in lines]
-
         # Line lengths.
-        sizes = [len(ts) for ts in tokens]
+        sizes = [len(line) for line in lines]
 
         # Embed tokens, regroup by line.
-        x = self.embed_tokens(list(chain(*tokens)))
+        x = self.embed_tokens(list(chain(*lines)))
         xs = utils.group_by_sizes(x, sizes)
 
         # Embed lines.
@@ -272,3 +271,43 @@ class LanguageModel(nn.Module):
     def forward(self, lines, ctx=False):
         x = self.embed(lines, ctx)
         return self.predict(x)
+
+    def collate_batch(self, batch):
+        """Labels -> indexes.
+        """
+        lines, labels = list(zip(*batch))
+
+        yt_idx = [self.vocab.stoi[label] for label in labels]
+        yt = torch.LongTensor(yt_idx).to(DEVICE)
+
+        return lines, yt
+
+
+START_TOKEN = '[START]'
+END_TOKEN = '[END]'
+MASK_TOKEN = '[MASK]'
+
+
+class MLMGenerator:
+
+    def __init__(self, lines):
+        self.lines = lines
+
+    def __len__(self):
+        return sum(map(len, self.lines))
+
+    def __iter__(self):
+        """Generate (masked tokens, target) pairs.
+        """
+        for line in self.lines:
+            for i, target in enumerate(line.clf_tokens):
+
+                masked = [
+                    token if j != i else MASK_TOKEN
+                    for j, token in enumerate(line.clf_tokens)
+                ]
+
+                yield [START_TOKEN] + masked + [END_TOKEN], target
+
+    def batches_iter(self, batch_size):
+        return chunked_iter(iter(self), batch_size)
