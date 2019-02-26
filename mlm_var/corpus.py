@@ -9,11 +9,6 @@ from tqdm import tqdm
 from . import utils, logger
 
 
-START_TOKEN = '[START]'
-END_TOKEN = '[END]'
-MASK_TOKEN = '[MASK]'
-
-
 @dataclass
 class Line:
 
@@ -33,17 +28,7 @@ class Line:
         """Parse JSON lines, build match objects.
         """
         for row in utils.read_json_gz_lines(root):
-            yield cls.from_dict(row)
-
-    def mask_tokens(self, idx):
-        """Mask the token at idx, add start/end tokens.
-        """
-        masked = [
-            t if i != idx else MASK_TOKEN
-            for i, t in enumerate(self.clf_tokens)
-        ]
-
-        return [START_TOKEN] + masked + [END_TOKEN]
+            yield cls.from_dict(row)\
 
 
 class Corpus:
@@ -73,9 +58,3 @@ class Corpus:
             counts.update(line.clf_tokens)
 
         return counts
-
-
-# class MLMSplit:
-#
-#     def __init__(self, lines):
-#         self.lines = lines
