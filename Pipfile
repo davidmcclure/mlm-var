@@ -12,6 +12,7 @@ tqdm = "*"
 numpy = "*"
 torchtext = "*"
 boltons = "*"
+click = "*"
 
 [dev-packages]
 

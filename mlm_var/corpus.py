@@ -1,5 +1,7 @@
 
 
+import pickle
+
 from typing import List
 from dataclasses import dataclass
 from itertools import islice
@@ -45,6 +47,15 @@ class Corpus:
         lines_iter = tqdm(islice(Line.read_spark_lines(path), skim))
 
         return cls(list(lines_iter), **kwargs)
+
+    @classmethod
+    def load(cls, path):
+        with open(path, 'rb') as fh:
+            return pickle.load(fh)
+
+    def save(self, path):
+        with open(path, 'wb') as fh:
+            pickle.dump(self, fh)
 
     def __init__(self, lines, test_frac=0.1):
         self.lines = lines
