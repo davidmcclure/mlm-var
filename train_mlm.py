@@ -116,10 +116,11 @@ def build_corpus(src, dst, skim, test_frac):
 
 @cli.command()
 @click.argument('src', type=click.Path())
+@click.argument('dst', type=click.Path())
 @click.option('--max_epochs', type=int, default=100)
 @click.option('--es_wait', type=int, default=5)
-@click.option('--eval_every', type=int, default=10000)
-def train(src, max_epochs, es_wait, eval_every):
+@click.option('--eval_every', type=int, default=100000)
+def train(src, dst, max_epochs, es_wait, eval_every):
     """Train, dump model.
     """
     corpus = Corpus.load(src)
@@ -132,6 +133,8 @@ def train(src, max_epochs, es_wait, eval_every):
 
     model = train_model(model, optimizer, loss_func, corpus,
         max_epochs, es_wait, eval_every)
+
+    torch.save(model, dst)
 
 
 if __name__ == '__main__':
