@@ -36,7 +36,7 @@ def train_epoch(model, optimizer, loss_func, split):
             losses.append(loss.item())
             bar.update(len(lines))
 
-            yield bar.n
+            yield len(lines)
 
 
 def predict(model, split):
@@ -105,11 +105,12 @@ def cli():
 @cli.command()
 @click.argument('src', type=click.Path())
 @click.argument('dst', type=click.Path())
+@click.option('--test_frac', type=float, default=0.1)
 @click.option('--skim', type=int, default=None)
 def build_corpus(src, dst, skim):
     """Freeze off train/dev/test splits.
     """
-    corpus = Corpus.from_spark_lines(src, skim)
+    corpus = Corpus.from_spark_lines(src, skim, test_frac=test_frac)
     corpus.save(dst)
 
 
