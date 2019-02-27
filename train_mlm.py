@@ -107,7 +107,7 @@ def cli():
 @click.argument('dst', type=click.Path())
 @click.option('--test_frac', type=float, default=0.1)
 @click.option('--skim', type=int, default=None)
-def build_corpus(src, dst, skim):
+def build_corpus(src, dst, skim, test_frac):
     """Freeze off train/dev/test splits.
     """
     corpus = Corpus.from_spark_lines(src, skim, test_frac=test_frac)
