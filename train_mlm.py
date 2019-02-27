@@ -45,7 +45,7 @@ def predict(model, split):
     model.eval()
 
     generator = MLMGenerator(split)
-    batches = generator.batches_iter(50)
+    batches = generator.batches_iter(200)
 
     yt, yp = [], []
     with tqdm(total=len(generator)) as bar:
@@ -119,7 +119,7 @@ def build_corpus(src, dst, skim, test_frac):
 @click.argument('dst', type=click.Path())
 @click.option('--max_epochs', type=int, default=100)
 @click.option('--es_wait', type=int, default=5)
-@click.option('--eval_every', type=int, default=100000)
+@click.option('--eval_every', type=int, default=1000000)
 def train(src, dst, max_epochs, es_wait, eval_every):
     """Train, dump model.
     """
