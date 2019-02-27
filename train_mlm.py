@@ -2,6 +2,7 @@
 
 import click
 import torch
+import math
 
 from torch import optim, nn
 from tqdm import tqdm
@@ -35,7 +36,7 @@ def train_epoch(model, optimizer, loss_func, split):
             losses.append(loss.item())
             bar.update(len(lines))
 
-    return losses
+            yield bar.n
 
 
 def predict(model, split):
@@ -67,23 +68,31 @@ def evaluate(model, loss_func, split):
     return loss_func(yp, yt)
 
 
-def train_model(model, optimizer, loss_func, corpus, max_epochs, es_wait):
+def train_model(model, optimizer, loss_func, corpus,
+    max_epochs, es_wait, eval_every):
     """Train for N epochs, or stop early.
     """
     losses = []
+    eval_n, total_n = 0, 0
     for i in range(max_epochs):
 
         logger.info(f'Epoch {i+1}')
-        train_epoch(model, optimizer, loss_func, corpus.train)
 
-        loss = evaluate(model, loss_func, corpus.val)
-        losses.append(loss)
+        for n in train_epoch(model, optimizer, loss_func, corpus.train):
 
-        logger.info(loss.item())
+            total_n += n
+            if total_n - eval_n >= eval_every:
 
-        # Stop early.
-        if len(losses) > es_wait and losses[-1] > losses[-es_wait]:
-            break
+                loss = evaluate(model, loss_func, corpus.val)
+                losses.append(loss)
+
+                logger.info('Val loss: %f' % loss.item())
+
+                # Stop early.
+                if len(losses) > es_wait and losses[-1] > losses[-es_wait]:
+                    break
+
+                eval_n = total_n
 
     return model
 
@@ -108,7 +117,8 @@ def build_corpus(src, dst, skim):
 @click.argument('src', type=click.Path())
 @click.option('--max_epochs', type=int, default=100)
 @click.option('--es_wait', type=int, default=5)
-def train(src, max_epochs, es_wait):
+@click.option('--eval_every', type=int, default=10000)
+def train(src, max_epochs, es_wait, eval_every):
     """Train, dump model.
     """
     corpus = Corpus.load(src)
@@ -120,7 +130,7 @@ def train(src, max_epochs, es_wait):
     loss_func = nn.NLLLoss()
 
     model = train_model(model, optimizer, loss_func, corpus,
-        max_epochs, es_wait)
+        max_epochs, es_wait, eval_every)
 
 
 if __name__ == '__main__':
