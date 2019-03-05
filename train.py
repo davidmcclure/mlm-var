@@ -2,14 +2,12 @@
 
 import click
 import torch
-import math
 
 from torch import optim, nn
 from tqdm import tqdm
 
 from mlm_var import logger
-from mlm_var.model import MLM, DEVICE, MLMGenerator
-from mlm_var.corpus import Corpus
+from mlm_var.bilm import Corpus, MLM, DEVICE, MLMGenerator
 
 
 def train_epoch(model, optimizer, loss_func, split):

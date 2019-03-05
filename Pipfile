@@ -13,6 +13,7 @@ numpy = "*"
 torchtext = "*"
 boltons = "*"
 click = "*"
+"flake8" = "*"
 
 [dev-packages]
 
