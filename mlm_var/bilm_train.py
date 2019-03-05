@@ -74,13 +74,16 @@ def train_model(model, optimizer, loss_func, corpus,
 
                 loss = evaluate(model, loss_func, corpus.val)
                 losses.append(loss)
-
                 logger.info('Val loss: %f' % loss)
 
                 # Stop early.
                 if len(losses) > es_wait and losses[-1] > losses[-es_wait]:
-                    # TODO: Eval test.
-                    break
+
+                    logger.info('Stopping early.')
+                    loss = evaluate(model, loss_func, corpus.test)
+                    logger.info('Test loss: %f' % loss)
+
+                    return model
 
                 eval_n = total_n
 
@@ -108,7 +111,7 @@ def build_corpus(src, dst, skim, test_frac):
 @click.argument('src', type=click.Path())
 @click.argument('dst', type=click.Path())
 @click.option('--max_epochs', type=int, default=100)
-@click.option('--es_wait', type=int, default=5)
+@click.option('--es_wait', type=int, default=2)
 @click.option('--eval_every', type=int, default=1000000)
 def train(src, dst, max_epochs, es_wait, eval_every):
     """Train, dump model.
