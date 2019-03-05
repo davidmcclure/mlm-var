@@ -76,8 +76,10 @@ def train_model(model, optimizer, loss_func, corpus,
                 losses.append(loss)
                 logger.info('Val loss: %f' % loss)
 
+                es_loss = losses[-(es_wait + 1)]
+
                 # Stop early.
-                if len(losses) > es_wait and losses[-1] > losses[-es_wait]:
+                if len(losses) > es_wait and losses[-1] >= es_loss:
 
                     logger.info('Stopping early.')
                     loss = evaluate(model, loss_func, corpus.test)
