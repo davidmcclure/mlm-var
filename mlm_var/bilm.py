@@ -309,7 +309,7 @@ class TokenLSTM(nn.Module):
         return x
 
 
-class MLM(nn.Module):
+class BiLM(nn.Module):
 
     def __init__(self, token_counts, max_vocab_size=MAX_VOCAB_SIZE,
         embed_size=CLF_EMBED_SIZE, hidden_size=CLF_HIDDEN_SIZE):
@@ -320,10 +320,14 @@ class MLM(nn.Module):
         self.vocab = Vocab(token_counts, max_size=max_vocab_size)
 
         self.embed_tokens = TokenEmbedding(token_counts)
-        self.encode_lines = TokenLSTM(self.embed_tokens.out_size)
+
+        self.encode_f = TokenLSTM(self.embed_tokens.out_dim, lstm_dim)
+        self.encode_b = TokenLSTM(self.embed_tokens.out_dim, lstm_dim)
+
+        fb_out_size = self.encode_f.out_size + self.encode_b.out_size
 
         self.merge = nn.Sequential(
-            nn.Linear(self.encode_lines.out_size, hidden_size),
+            nn.Linear(fb_out_size, hidden_size),
             nn.ReLU(),
             nn.Linear(hidden_size, embed_size),
         )
@@ -336,10 +340,10 @@ class MLM(nn.Module):
         )
 
     def embed(self, lines):
-        """Embed lines.
+        """Produce standalone + contextual embeddings for tokens.
         """
         # Line lengths.
-        sizes = [len(line) for line in lines]
+        sizes = [len(line.bilm_clf_tokens) for line in lines]
 
         # Embed tokens, regroup by line.
         x = self.embed_tokens(list(chain(*lines)))
