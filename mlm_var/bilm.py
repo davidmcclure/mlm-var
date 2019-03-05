@@ -25,8 +25,7 @@ from . import utils, logger
 LSTM_HIDDEN_SIZE = 512
 LSTM_NUM_LAYERS = 1
 MAX_VOCAB_SIZE = 10000
-CLF_EMBED_SIZE = 512
-CLF_HIDDEN_SIZE = 256
+CLF_EMBED_SIZE = 1024
 
 
 START_TOKEN = '[START]'
@@ -270,49 +269,33 @@ class TokenLSTM(nn.Module):
         self.lstm = nn.LSTM(
             input_size=input_size,
             hidden_size=hidden_size,
-            num_layers=num_layers,
             batch_first=True,
-            bidirectional=True,
+            num_layers=num_layers,
         )
 
-        self.out_size = self.lstm.hidden_size * 2
+        self.out_size = self.lstm.hidden_size
 
     def forward(self, xs):
         """Sort, pack, encode, reorder.
 
         Args:
             xs (list<Tensor>): Variable-length embedding tensors.
-
-        Returns:
-            x (Tensor)
-            states (list<Tensor): LSTM states per input.
         """
         sizes = list(map(len, xs))
 
-        # Indexes to sort descending.
-        sort_idxs = np.argsort(sizes)[::-1]
+        # Pad + LSTM.
+        x = rnn.pad_sequence(xs, batch_first=True)
+        x, _ = self.lstm(x)
 
-        # Indexes to restore original order.
-        unsort_idxs = torch.from_numpy(np.argsort(sort_idxs)).to(DEVICE)
+        # Unpad.
+        return [s[:size] for s, size in zip(x, sizes)]
 
-        # Sort by size descending.
-        xs = [xs[i] for i in sort_idxs]
-
-        # Pad + pack, LSTM.
-        x = rnn.pack_sequence(xs)
-        _, (hn, _) = self.lstm(x)
-
-        # Cat forward + backward hidden layers.
-        x = torch.cat([hn[0,:,:], hn[1,:,:]], dim=1)
-        x = x[unsort_idxs]
-
-        return x
 
 
 class BiLM(nn.Module):
 
     def __init__(self, token_counts, max_vocab_size=MAX_VOCAB_SIZE,
-        embed_size=CLF_EMBED_SIZE, hidden_size=CLF_HIDDEN_SIZE):
+        embed_size=CLF_EMBED_SIZE):
         """Initialize encoders + clf.
         """
         super().__init__()
@@ -321,15 +304,15 @@ class BiLM(nn.Module):
 
         self.embed_tokens = TokenEmbedding(token_counts)
 
-        self.encode_f = TokenLSTM(self.embed_tokens.out_dim, lstm_dim)
-        self.encode_b = TokenLSTM(self.embed_tokens.out_dim, lstm_dim)
+        self.encode_f = TokenLSTM(self.embed_tokens.out_size)
+        self.encode_b = TokenLSTM(self.embed_tokens.out_size)
 
         fb_out_size = self.encode_f.out_size + self.encode_b.out_size
 
         self.merge = nn.Sequential(
-            nn.Linear(fb_out_size, hidden_size),
+            nn.Linear(fb_out_size, embed_size),
             nn.ReLU(),
-            nn.Linear(hidden_size, embed_size),
+            nn.Linear(embed_size, embed_size),
         )
 
         self.dropout = nn.Dropout()
@@ -342,63 +325,55 @@ class BiLM(nn.Module):
     def embed(self, lines):
         """Produce standalone + contextual embeddings for tokens.
         """
-        # Line lengths.
-        sizes = [len(line.bilm_clf_tokens) for line in lines]
+        tokens = [line.padded_clf_tokens for line in lines]
+
+        # Padded + unpadded line lengths.
+        sizes = [len(line) for line in lines]
+        padded_sizes = [len(ts) for ts in tokens]
 
         # Embed tokens, regroup by line.
-        x = self.embed_tokens(list(chain(*lines)))
-        xs = utils.group_by_sizes(x, sizes)
+        x = self.embed_tokens(list(chain(*tokens)))
+        x = utils.group_by_sizes(x, padded_sizes)
 
-        # Embed lines.
-        x = self.encode_lines(xs)
+        # Snip off padding tokens.
+        embeds = [xi[1:-1] for xi in x]
 
-        # Blend encoder outputs, dropout.
+        # Forward LSTM.
+        xf = self.encode_f(x)
+
+        # TODO: Test this logic.
+
+        # Backward LSTM.
+        x_rev = [xi.flip(0) for xi in x]
+        xb = self.encode_b(x_rev)
+        xb = [xi.flip(0) for xi in xb]
+
+        # Cat [forward n-1, backward n+1] states for each token.
+        x = [
+            torch.cat([xfi[:-2], xbi[2:]], dim=1)
+            for xfi, xbi in zip(xf, xb)
+        ]
+
+        x = torch.cat(x, dim=0)
         x = self.merge(x)
-        x = self.dropout(x)
 
-        return x
+        ctx_embeds = utils.group_by_sizes(x, sizes)
+
+        return embeds, ctx_embeds
 
     def forward(self, lines):
-        x = self.embed(lines)
-        return self.predict(x)
+        _, x = self.embed(lines)
+        return self.predict(torch.cat(x, 0))
 
     def collate_batch(self, batch):
         """Labels -> indexes.
         """
-        lines, labels = list(zip(*batch))
+        yt_idx = [
+            self.vocab.stoi[token]
+            for line in batch
+            for token in line.clf_tokens
+        ]
 
-        yt_idx = [self.vocab.stoi[label] for label in labels]
         yt = torch.LongTensor(yt_idx).to(DEVICE)
 
-        return lines, yt
-
-
-# START_TOKEN = '[START]'
-# END_TOKEN = '[END]'
-# MASK_TOKEN = '[MASK]'
-
-
-# class MLMGenerator:
-#
-#     def __init__(self, lines):
-#         self.lines = lines
-#
-#     def __len__(self):
-#         return sum(map(len, self.lines))
-#
-#     def __iter__(self):
-#         """Generate (masked tokens, target) pairs.
-#         """
-#         for line in self.lines:
-#
-#             for i, target in enumerate(line.clf_tokens):
-#
-#                 masked = [
-#                     token if j != i else MASK_TOKEN
-#                     for j, token in enumerate(line.clf_tokens)
-#                 ]
-#
-#                 yield [START_TOKEN] + masked + [END_TOKEN], target
-#
-#     def batches_iter(self, batch_size):
-#         return chunked_iter(iter(self), batch_size)
+        return batch, yt
