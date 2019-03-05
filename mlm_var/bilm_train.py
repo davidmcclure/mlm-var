@@ -50,7 +50,7 @@ def evaluate(model, loss_func, split, batch_size=200):
     loss, size = 0, 0
     with tqdm(total=len(split)) as bar:
         for lines, yt in loader:
-            loss += F.nll_loss(model(lines), yt, reduction='sum')
+            loss += F.nll_loss(model(lines), yt, reduction='sum').item()
             size += len(yt)
             bar.update(len(lines))
 
@@ -75,7 +75,7 @@ def train_model(model, optimizer, loss_func, corpus,
                 loss = evaluate(model, loss_func, corpus.val)
                 losses.append(loss)
 
-                logger.info('Val loss: %f' % loss.item())
+                logger.info('Val loss: %f' % loss)
 
                 # Stop early.
                 if len(losses) > es_wait and losses[-1] > losses[-es_wait]:
