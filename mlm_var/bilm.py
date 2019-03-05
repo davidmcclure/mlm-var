@@ -21,6 +21,18 @@ from torch.nn import functional as F
 from . import utils, logger
 
 
+# TODO: How to handle this kind of config?
+LSTM_HIDDEN_SIZE = 512
+LSTM_NUM_LAYERS = 1
+MAX_VOCAB_SIZE = 10000
+CLF_EMBED_SIZE = 512
+CLF_HIDDEN_SIZE = 256
+
+
+START_TOKEN = '[START]'
+END_TOKEN = '[END]'
+
+
 @dataclass
 class Line:
 
@@ -44,6 +56,10 @@ class Line:
 
     def __len__(self):
         return len(self.clf_tokens)
+
+    @property
+    def padded_clf_tokens(self):
+        return [START_TOKEN] + self.clf_tokens + [END_TOKEN]
 
 
 class Corpus:
@@ -243,10 +259,6 @@ class TokenEmbedding(nn.Module):
         return x
 
 
-LSTM_HIDDEN_SIZE = 512
-LSTM_NUM_LAYERS = 1
-
-
 class TokenLSTM(nn.Module):
 
     def __init__(self, input_size, hidden_size=LSTM_HIDDEN_SIZE,
@@ -297,11 +309,6 @@ class TokenLSTM(nn.Module):
         return x
 
 
-MAX_VOCAB_SIZE = 10000
-CLF_EMBED_SIZE = 512
-CLF_HIDDEN_SIZE = 256
-
-
 class MLM(nn.Module):
 
     def __init__(self, token_counts, max_vocab_size=MAX_VOCAB_SIZE,
@@ -328,7 +335,7 @@ class MLM(nn.Module):
             nn.LogSoftmax(1),
         )
 
-    def embed(self, lines, ctx):
+    def embed(self, lines):
         """Embed lines.
         """
         # Line lengths.
@@ -347,8 +354,8 @@ class MLM(nn.Module):
 
         return x
 
-    def forward(self, lines, ctx=False):
-        x = self.embed(lines, ctx)
+    def forward(self, lines):
+        x = self.embed(lines)
         return self.predict(x)
 
     def collate_batch(self, batch):
@@ -362,31 +369,32 @@ class MLM(nn.Module):
         return lines, yt
 
 
-START_TOKEN = '[START]'
-END_TOKEN = '[END]'
-MASK_TOKEN = '[MASK]'
+# START_TOKEN = '[START]'
+# END_TOKEN = '[END]'
+# MASK_TOKEN = '[MASK]'
 
 
-class MLMGenerator:
-
-    def __init__(self, lines):
-        self.lines = lines
-
-    def __len__(self):
-        return sum(map(len, self.lines))
-
-    def __iter__(self):
-        """Generate (masked tokens, target) pairs.
-        """
-        for line in self.lines:
-            for i, target in enumerate(line.clf_tokens):
-
-                masked = [
-                    token if j != i else MASK_TOKEN
-                    for j, token in enumerate(line.clf_tokens)
-                ]
-
-                yield [START_TOKEN] + masked + [END_TOKEN], target
-
-    def batches_iter(self, batch_size):
-        return chunked_iter(iter(self), batch_size)
+# class MLMGenerator:
+#
+#     def __init__(self, lines):
+#         self.lines = lines
+#
+#     def __len__(self):
+#         return sum(map(len, self.lines))
+#
+#     def __iter__(self):
+#         """Generate (masked tokens, target) pairs.
+#         """
+#         for line in self.lines:
+#
+#             for i, target in enumerate(line.clf_tokens):
+#
+#                 masked = [
+#                     token if j != i else MASK_TOKEN
+#                     for j, token in enumerate(line.clf_tokens)
+#                 ]
+#
+#                 yield [START_TOKEN] + masked + [END_TOKEN], target
+#
+#     def batches_iter(self, batch_size):
+#         return chunked_iter(iter(self), batch_size)
