@@ -6,24 +6,25 @@ import torch
 from torch import optim, nn
 from tqdm import tqdm
 
+from torch.utils.data import DataLoader
+
 from mlm_var import logger
-from mlm_var.bilm import Corpus, MLM, DEVICE, MLMGenerator
+from mlm_var.bilm import Corpus, BiLM, DEVICE
 
 
-def train_epoch(model, optimizer, loss_func, split):
+def train_epoch(model, optimizer, loss_func, split, batch_size=50):
     """Train a single epoch, return batch losses.
     """
-    generator = MLMGenerator(split)
-    batches = generator.batches_iter(50)
+    loader = DataLoader(split, collate_fn=model.collate_batch,
+        batch_size=batch_size)
 
     losses = []
-    with tqdm(total=len(generator)) as bar:
-        for batch in batches:
+    with tqdm(total=len(split)) as bar:
+        for lines, yt in loader:
 
             model.train()
             optimizer.zero_grad()
 
-            lines, yt = model.collate_batch(batch)
             yp = model(lines)
 
             loss = loss_func(yp, yt)
@@ -37,18 +38,17 @@ def train_epoch(model, optimizer, loss_func, split):
             yield len(lines)
 
 
-def predict(model, split):
+def predict(model, split, batch_size=200):
     """Predict inputs in a split.
     """
     model.eval()
 
-    generator = MLMGenerator(split)
-    batches = generator.batches_iter(200)
+    loader = DataLoader(split, collate_fn=model.collate_batch,
+        batch_size=batch_size)
 
     yt, yp = [], []
-    with tqdm(total=len(generator)) as bar:
-        for batch in batches:
-            lines, yti = model.collate_batch(batch)
+    with tqdm(total=len(split)) as bar:
+        for lines, yti in loader:
             yp += model(lines).tolist()
             yt += yti.tolist()
             bar.update(len(lines))
@@ -124,7 +124,7 @@ def train(src, dst, max_epochs, es_wait, eval_every):
     corpus = Corpus.load(src)
     token_counts = corpus.token_counts()
 
-    model = MLM(token_counts).to(DEVICE)
+    model = BiLM(token_counts).to(DEVICE)
 
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
     loss_func = nn.NLLLoss()
