@@ -7,6 +7,7 @@ from torch import optim, nn
 from tqdm import tqdm
 
 from torch.utils.data import DataLoader
+from torch.nn import functional as F
 
 from mlm_var import logger
 from mlm_var.bilm import Corpus, BiLM, DEVICE
@@ -38,32 +39,22 @@ def train_epoch(model, optimizer, loss_func, split, batch_size=50):
             yield len(lines)
 
 
-def predict(model, split, batch_size=200):
-    """Predict inputs in a split.
+def evaluate(model, loss_func, split, batch_size=200):
+    """Compute loss for split.
     """
     model.eval()
 
     loader = DataLoader(split, collate_fn=model.collate_batch,
         batch_size=batch_size)
 
-    yt, yp = [], []
+    loss, size = 0, 0
     with tqdm(total=len(split)) as bar:
-        for lines, yti in loader:
-            yp += model(lines).tolist()
-            yt += yti.tolist()
+        for lines, yt in loader:
+            loss += F.nll_loss(model(lines), yt, reduction='sum')
+            size += len(yt)
             bar.update(len(lines))
 
-    yt = torch.LongTensor(yt)
-    yp = torch.FloatTensor(yp)
-
-    return yt, yp
-
-
-def evaluate(model, loss_func, split):
-    """Predict matches in split, log accuracy, return loss.
-    """
-    yt, yp = predict(model, split)
-    return loss_func(yp, yt)
+    return loss / size
 
 
 def train_model(model, optimizer, loss_func, corpus,
@@ -88,6 +79,7 @@ def train_model(model, optimizer, loss_func, corpus,
 
                 # Stop early.
                 if len(losses) > es_wait and losses[-1] > losses[-es_wait]:
+                    # TODO: Eval test.
                     break
 
                 eval_n = total_n
