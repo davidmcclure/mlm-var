@@ -35,7 +35,6 @@ END_TOKEN = '[END]'
 @dataclass
 class Line:
 
-    domain: str
     tokens: List[str]
     clf_tokens: List[str]
 
