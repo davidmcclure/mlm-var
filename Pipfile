@@ -14,6 +14,7 @@ torchtext = "*"
 boltons = "*"
 click = "*"
 "flake8" = "*"
+pandas = "*"
 
 [dev-packages]
 

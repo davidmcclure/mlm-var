@@ -1,14 +1,12 @@
 
 
 import torch
-import numpy as np
 import string
 import pickle
 
 from tqdm import tqdm
 from dataclasses import dataclass
 from typing import List
-from boltons.iterutils import chunked_iter
 from collections import Counter
 from itertools import chain, islice
 
@@ -288,7 +286,6 @@ class TokenLSTM(nn.Module):
 
         # Unpad.
         return [s[:size] for s, size in zip(x, sizes)]
-
 
 
 class BiLM(nn.Module):
