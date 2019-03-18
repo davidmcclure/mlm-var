@@ -19,7 +19,7 @@ from torch.nn import functional as F
 from . import utils, logger
 
 
-# TODO: How to handle this kind of config?
+# TODO: How to handle this config?
 LSTM_HIDDEN_SIZE = 512
 LSTM_NUM_LAYERS = 1
 MAX_VOCAB_SIZE = 10000
